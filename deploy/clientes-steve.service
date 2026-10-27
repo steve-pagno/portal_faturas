@@ -1,0 +1,16 @@
+[Unit]
+Description=Gestão de Clientes (Next.js) — faturas.steve.dev.br
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=steve
+WorkingDirectory=/home/steve/Documentos/Mellonry/Clientes Steve
+Environment=NODE_ENV=production
+ExecStart="/home/steve/Documentos/Mellonry/Clientes Steve/node_modules/.bin/next" start -p 3100 -H 127.0.0.1
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

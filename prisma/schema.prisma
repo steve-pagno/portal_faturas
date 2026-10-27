@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// role: "ADMIN" | "CLIENT"
+model User {
+  id             String      @id @default(cuid())
+  name           String
+  email          String      @unique
+  cpf            String?     @unique // apenas dígitos
+  phone          String?
+  role           String      @default("CLIENT")
+  passwordHash   String?
+  sessionVersion Int         @default(0) // incrementado ao trocar senha -> derruba sessões antigas
+  active         Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  invoices       Invoice[]
+  contracts      Contract[]
+  tokens         AuthToken[]
+  emails         EmailLog[]
+}
+
+model Product {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  priceCents  Int        @default(0) // valor sugerido
+  active      Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  invoices    Invoice[]
+  contracts   Contract[]
+}
+
+// status: "ACTIVE" | "CANCELED"  ("quitado" é derivado: todas as parcelas pagas)
+model Contract {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id])
+  title       String
+  description String?
+  totalCents  Int
+  startDate   DateTime? // data pura (12:00 UTC)
+  status      String    @default("ACTIVE")
+  pdfPath     String? // relativo a STORAGE_DIR
+  pdfName     String?
+  pdfSize     Int?
+  canceledAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  invoices    Invoice[]
+
+  @@index([userId])
+}
+
+// status: "PENDING" | "PAID" | "CANCELED"  ("vencida" é derivado de PENDING + dueDate)
+model Invoice {
+  id                Int        @id @default(autoincrement())
+  userId            String
+  user              User       @relation(fields: [userId], references: [id])
+  productId         String
+  product           Product    @relation(fields: [productId], references: [id])
+  contractId        String?
+  contract          Contract?  @relation(fields: [contractId], references: [id])
+  installmentNumber Int? // parcela N de installmentCount
+  installmentCount  Int?
+  description       String?
+  amountCents       Int
+  dueDate           DateTime // guardado como 12:00 UTC do dia de vencimento
+  status            String     @default("PENDING")
+  paidAt            DateTime?
+  canceledAt        DateTime?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  emails            EmailLog[]
+
+  // Checkout InfinitePay
+  paymentUrl            String?
+  paymentOrderNsu       String? @unique // nosso identificador enviado à InfinitePay
+  paymentSlug           String?
+  paymentLinkAmount     Int? // valor (centavos) do link atual; se a fatura mudar de valor, gera outro
+  paymentTransactionNsu String? @unique
+  paymentMethod         String? // "pix" | "credit_card"
+  paymentReceiptUrl     String?
+
+  @@index([userId])
+  @@index([contractId])
+  @@index([status, dueDate])
+}
+
+// type: "INVITE" | "RESET"
+model AuthToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+// status: "SENT" | "FAILED"
+model EmailLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  invoiceId Int?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  type      String
+  to        String
+  subject   String
+  status    String
+  error     String?
+  dedupeKey String?  @unique // evita reenviar o mesmo lembrete
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
