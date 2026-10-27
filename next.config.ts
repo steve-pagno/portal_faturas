@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // build enxuto para a imagem Docker (ver Dockerfile)
+  ...(process.env.BUILD_STANDALONE === "1" && { output: "standalone" }),
   experimental: {
     // upload do PDF do contrato vai por server action (padrão é 1 MB)
     serverActions: {

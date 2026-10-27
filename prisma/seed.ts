@@ -1,6 +1,10 @@
-import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+
+// carrega o .env quando existir (no Docker as variáveis já vêm do compose)
+try {
+  process.loadEnvFile();
+} catch {}
 
 const db = new PrismaClient();
 

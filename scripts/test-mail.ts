@@ -1,6 +1,10 @@
 // Envia um e-mail de teste com o driver configurado:  npm run mail:test -- voce@email.com
-import "dotenv/config";
 import { sendMail } from "../src/lib/mail";
+
+// carrega o .env quando existir (no Docker as variáveis já vêm do compose)
+try {
+  process.loadEnvFile();
+} catch {}
 
 const to = process.argv[2];
 if (!to) {

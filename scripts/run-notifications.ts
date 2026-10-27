@@ -1,8 +1,12 @@
 // Roda uma rodada de notificações agendadas pela linha de comando (ex.: crontab).
 //   0 8 * * * cd /caminho/do/projeto && npm run notify
-import "dotenv/config";
 import { runScheduledNotifications } from "../src/lib/notifications";
 import { db } from "../src/lib/db";
+
+// carrega o .env quando existir (no Docker as variáveis já vêm do compose)
+try {
+  process.loadEnvFile();
+} catch {}
 
 runScheduledNotifications()
   .then((summary) => console.log("Notificações:", summary))

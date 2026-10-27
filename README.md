@@ -7,15 +7,18 @@ Plataforma em Next.js para cadastrar clientes, produtos e faturas, com avisos po
 
 ## Rodando
 
+O banco é MySQL. Em desenvolvimento ele roda em um container, e o app roda com `npm run dev`:
+
 ```bash
-cp .env.example .env      # preencha AUTH_SECRET (openssl rand -base64 48), ADMIN_* e CRON_SECRET
+cp .env.example .env      # preencha AUTH_SECRET (openssl rand -base64 48), MYSQL_*, ADMIN_* e CRON_SECRET
 npm install
-npm run db:push           # cria o banco (SQLite em prisma/dev.db)
+docker compose up -d db   # MySQL em 127.0.0.1:3308
+npm run db:deploy         # aplica as migrations
 npm run seed              # cria/atualiza o admin a partir do .env
 npm run dev               # http://localhost:3000
 ```
 
-Produção: `npm run build && npm start`. Defina `APP_URL` com a URL pública. Com `https://`, o cookie de sessão sai como `Secure`.
+**Para mudar o schema**, edite `prisma/schema.prisma` e gere uma migration com `npx prisma migrate dev --name descricao`. Esse comando precisa criar um banco temporário, então rode-o com o usuário root: `DATABASE_URL="mysql://root:<MYSQL_ROOT_PASSWORD>@127.0.0.1:3308/faturas" npx prisma migrate dev --name ...`. Comite a pasta `prisma/migrations`. O servidor aplica as migrations sozinho ao subir.
 
 ## Fluxo do cliente
 
@@ -89,21 +92,25 @@ Com `INFINITEPAY_API_KEY` no `.env`, cada fatura ganha um link do Checkout Integ
 - **Segurança:** o webhook da InfinitePay não é assinado. Por isso a fatura só é marcada como paga depois de conferir em `payment_check` que o pagamento existe e que o valor bate.
 - **Valor alterado:** se o valor da fatura mudar, um novo link é gerado no próximo envio. No admin há o botão "Gerar novo link".
 
-## Produção (faturas.steve.dev.br)
+## Produção com Docker (faturas.steve.dev.br)
 
-O app roda como serviço systemd em `127.0.0.1:3100`, e o Cloudflare Tunnel publica esse endereço em `https://faturas.steve.dev.br`.
+O `docker-compose.yml` sobe o MySQL (`db`) e o app (`app`, em `127.0.0.1:3100`). O Cloudflare Tunnel publica `http://localhost:3100` em `https://faturas.steve.dev.br`.
 
+**Primeira instalação no servidor:**
 ```bash
-npm run build
-sudo cp deploy/clientes-steve.service /etc/systemd/system/
-sudo systemctl daemon-reload && sudo systemctl enable --now clientes-steve
-journalctl -u clientes-steve -f          # logs
-./deploy/update.sh                        # atualizar: backup do banco, build e restart
+git clone https://github.com/steve-pagno/portal_faturas.git && cd portal_faturas
+# copie o .env de produção (não vai pelo Git); APP_URL precisa ser https://faturas.steve.dev.br
+docker compose up -d --build
+docker compose exec app tsx prisma/seed.ts     # cria o admin (se o banco estiver vazio)
 ```
 
-No túnel, configure o Public Hostname `faturas.steve.dev.br` com o serviço `http://localhost:3100`. No `.env`, `APP_URL` precisa ser `https://faturas.steve.dev.br`. Os links dos e-mails, o cookie seguro, o webhook da InfinitePay e os redirecionamentos dependem dele.
+**Atualizar:** `./deploy/update.sh`. O script faz um dump do MySQL em `backups/`, depois `git pull`, rebuild e aplica as migrations.
 
-Backup: `prisma/dev.db`, `storage/` e `.env`.
+**Logs:** `docker compose logs -f app`
+
+**Mandar um e-mail de teste:** `docker compose exec app tsx scripts/test-mail.ts voce@email.com`
+
+**Backup:** o volume do MySQL (os dumps ficam em `backups/`), a pasta `storage/` (PDFs) e o `.env`.
 
 ## Estrutura
 
@@ -120,4 +127,4 @@ src/app/portal/             área do cliente
 
 Valores ficam em centavos (`Int`). Vencimentos são datas puras, gravadas às 12:00 UTC. "Hoje" é calculado no fuso `America/Sao_Paulo`.
 
-Para trocar para Postgres, mude o `provider` em `prisma/schema.prisma` e a `DATABASE_URL`. Depois rode `npx prisma migrate dev`.
+As migrations ficam em `prisma/migrations`. O container aplica as pendentes ao iniciar, com `prisma migrate deploy`.

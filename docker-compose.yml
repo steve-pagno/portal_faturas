@@ -1,0 +1,49 @@
+services:
+  db:
+    image: mysql:8.4
+    container_name: portal-faturas-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: faturas
+      MYSQL_USER: faturas
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?defina MYSQL_PASSWORD no .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?defina MYSQL_ROOT_PASSWORD no .env}
+      TZ: America/Sao_Paulo
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    ports:
+      # só localhost; usado para rodar o app em modo dev fora do Docker (npm run dev)
+      - "127.0.0.1:${MYSQL_HOST_PORT:-3308}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  app:
+    build:
+      context: .
+      args:
+        APP_URL: ${APP_URL:-https://faturas.steve.dev.br}
+    image: portal-faturas
+    container_name: portal-faturas
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      # dentro do Docker o app fala com o MySQL pelo nome do serviço (sobrescreve o .env)
+      DATABASE_URL: mysql://faturas:${MYSQL_PASSWORD}@db:3306/faturas
+      STORAGE_DIR: /app/storage
+      PORT: "3100"
+      HOSTNAME: 0.0.0.0
+    ports:
+      # só no localhost: o acesso externo é pelo Cloudflare Tunnel
+      - "127.0.0.1:3100:3100"
+    volumes:
+      - ./storage:/app/storage # PDFs dos contratos
+
+volumes:
+  mysql-data:

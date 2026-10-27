@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -29,7 +29,7 @@ model User {
 model Product {
   id          String     @id @default(cuid())
   name        String
-  description String?
+  description String?    @db.Text
   priceCents  Int        @default(0) // valor sugerido
   active      Boolean    @default(true)
   createdAt   DateTime   @default(now())
@@ -46,12 +46,12 @@ model Contract {
   productId   String
   product     Product   @relation(fields: [productId], references: [id])
   title       String
-  description String?
+  description String?   @db.Text
   totalCents  Int
   startDate   DateTime? // data pura (12:00 UTC)
   status      String    @default("ACTIVE")
-  pdfPath     String? // relativo a STORAGE_DIR
-  pdfName     String?
+  pdfPath     String?   @db.Text // relativo a STORAGE_DIR
+  pdfName     String?   @db.Text
   pdfSize     Int?
   canceledAt  DateTime?
   createdAt   DateTime  @default(now())
@@ -72,7 +72,7 @@ model Invoice {
   contract          Contract?  @relation(fields: [contractId], references: [id])
   installmentNumber Int? // parcela N de installmentCount
   installmentCount  Int?
-  description       String?
+  description       String?    @db.Text
   amountCents       Int
   dueDate           DateTime // guardado como 12:00 UTC do dia de vencimento
   status            String     @default("PENDING")
@@ -83,13 +83,13 @@ model Invoice {
   emails            EmailLog[]
 
   // Checkout InfinitePay
-  paymentUrl            String?
+  paymentUrl            String? @db.Text
   paymentOrderNsu       String? @unique // nosso identificador enviado à InfinitePay
   paymentSlug           String?
   paymentLinkAmount     Int? // valor (centavos) do link atual; se a fatura mudar de valor, gera outro
   paymentTransactionNsu String? @unique
   paymentMethod         String? // "pix" | "credit_card"
-  paymentReceiptUrl     String?
+  paymentReceiptUrl     String? @db.Text
 
   @@index([userId])
   @@index([contractId])
@@ -117,9 +117,9 @@ model EmailLog {
   invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
   type      String
   to        String
-  subject   String
+  subject   String   @db.Text
   status    String
-  error     String?
+  error     String?  @db.Text
   dedupeKey String?  @unique // evita reenviar o mesmo lembrete
   createdAt DateTime @default(now())
 
